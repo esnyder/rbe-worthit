@@ -1,0 +1,7 @@
+Purpose: Provide a non-technical friendly tool for Rogue Book Exchange 
+(www.roguebooks.org) volunteers to easily sort incoming book donations
+and determine which ones are worth listing for sale.
+
+Installation: Place the isbnsearch.py script in your cgi-bin, place an
+amazon.keys file in /etc/apache2/ with your keys.
+

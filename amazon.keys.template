@@ -1,0 +1,11 @@
+#
+# Replace the YOUR_KEY_HERE below with the key values given to you
+# by Amazon when you register for the Product API
+#
+# Then copy the edited version of this file to /etc/apache2/amazon.keys
+# for isbnsearch.py to pick it up.
+#
+
+[keys]
+AMAZON_ACCESS_KEY: YOUR_KEY_HERE
+AMAZON_SECRET_KEY: YOUR_KEY_HERE

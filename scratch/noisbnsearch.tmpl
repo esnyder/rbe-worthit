@@ -1,0 +1,36 @@
+<html>
+<head><title>Worth It?</title></head>
+
+<body>
+<h2>Worth It?</h2>
+
+query parameters: </br>
+title: [% title %]</br>
+author: [% author %]</br>
+publisher: [% publisher %]</br>
+media: [% media %]</br>
+year: [% year %]</br>
+
+Found [% propcount %] properties </br>
+
+<table>
+[% FOREACH prop = properties %]
+  <tr>
+    <td colspan=3>[% prop.ProductName %]</td>
+  </tr>
+  <tr>
+    <td>[% prop.ASIN %]</td>
+    <td>[% prop.publisher %]</td>
+    <td>Sales Rank: [% prop.SalesRank %]</td>
+  </tr>
+  <tr>
+    <td>[% prop.UsedCount %] used from [% prop.UsedPrice %]</td>
+    <td>[% prop.ThirdPartyNewCount %] new from [% prop.ListPrice %]</td>
+    <td>[% prop.CollectibleCount %] collectible from [% prop.CollectiblePrice %]</td>
+  </tr>
+  <tr><td colspan=3>&nbsp;</td></tr>
+[% END %]
+</table>
+
+</body>
+</html>
