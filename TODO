@@ -1,0 +1,4 @@
+* Fix exception when using bogus ISBN
+
+* Fix to allow all media types
+
