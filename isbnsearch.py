@@ -54,6 +54,17 @@ def collectlowprices(bycond, isbn, node):
     except AttributeError, e:
         pass
 
+
+def firstof(lxmlnode, possibleattributes):
+    for attr in possibleattributes:
+        try:
+            res = lxmlnode.__getattr__(attr)
+            return res
+        except AttributeError, e:
+            pass
+    return "(none)"
+
+
 def outputsearch(node, node2):
     print "<table border='1'>"
     
@@ -62,13 +73,11 @@ def outputsearch(node, node2):
     for item in node.Items.Item:
         print "<tr>"
         atr = item.ItemAttributes
+
         print "<td>"
-        author = ""
-        try:
-            author = atr.Author
-        except AttributeError, e:
-            author = atr.Artist
-        print atr.Title, "<br>ASIN: ", item.ASIN, "<br>by", author, ",", atr.Publisher, "sales rank:", locale.format("%d", int(item.SalesRank), True)
+        author = firstof(atr, ["Author", "Artist", "Creator"])
+        pub = firstof(atr, ["Publisher", "Label"])
+        print atr.Title, "<br>ASIN: ", item.ASIN, "<br>by", author, ",", pub, "sales rank:", locale.format("%d", int(item.SalesRank), True)
         print "</td>"
         
         offs = item.OfferSummary

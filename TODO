@@ -1,4 +1,12 @@
-* Fix exception when using bogus ISBN
+* Fix exception when all ISBNs are eliminated from the list as invalid
 
-* Fix to allow all media types
+* Color code table rows if we can make a programmatic decision about listability.
+
+* Figure out how to integrate non-ISBN sorting.
+
+* Make it prettier.
+
+* Make a CLI only version.
+
+* Make a CLI interactive version.
 
