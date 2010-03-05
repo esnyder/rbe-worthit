@@ -1,4 +1,3 @@
-* Fix exception when all ISBNs are eliminated from the list as invalid
 
 * Color code table rows if we can make a programmatic decision about listability.
 
