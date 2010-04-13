@@ -8,7 +8,6 @@ from amazonproduct import *
 
 cgitb.enable()
 
-
 def dosearch(api, isbn, page):
     node = None
     try:
@@ -21,7 +20,9 @@ def dosearch(api, isbn, page):
     return node
 
 def safe_note(s):
-    return unicodedata.normalize('NFKD', s).encode('ascii', 'ignore')
+    res = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore')
+    res = cgi.escape(res, True)
+    return res.replace('\'', "&rsquot;")
 
 # do it this way so we can get two or more pages of offers right off the bat
 def collectlowprices(bycond, item):
@@ -66,34 +67,35 @@ def formatitem(item, item2):
         author = firstof(atr, ["Author", "Artist", "Creator"])
         pub = firstof(atr, ["Publisher", "Label"])
         sr = firstof(item, ["SalesRank"], 0)
-        print >>res, atr.Title, "<br>ASIN: ", item.ASIN, "<br>by", author, ",", pub, "sales rank:", locale.format("%d", int(sr), True)
+        print >>res, "<b>", cgi.escape(str(atr.Title), True), "</b><br>ASIN: ", item.ASIN, "<br>by", cgi.escape(str(author)), ",", cgi.escape(str(pub))
         print >> res, "</td>"
 
         offs = item.OfferSummary
-        print >>res, "<td>"
+        print >>res, "<td><table>"
+        print >>res, "<tr><td colspan=2>SalesRank <b>", locale.format("%d", int(sr), True), "</b></td></tr>"
         try:
-            print >>res, "%d New from %s<br>" % (offs.TotalNew, offs.LowestNewPrice.FormattedPrice)
+            print >>res, "<tr><td align=right>%d N</td><td> &gt;= %s</td></tr>" % (offs.TotalNew, offs.LowestNewPrice.FormattedPrice)
         except:
-            print >>res, "0 New available<br>"
+            print >>res, "<tr><td align=right>0 N</td><td></td></tr>"
         try:
-            print >>res, "%d Used from %s<br>" % (offs.TotalUsed, offs.LowestUsedPrice.FormattedPrice)
+            print >>res, "<tr><td align=right>%d U</td><td> &gt;= %s</td></tr>" % (offs.TotalUsed, offs.LowestUsedPrice.FormattedPrice)
         except:
-            print >>res, "0 Used available</br>"
+            print >>res, "<tr><td align=right>0 U</td><td></td></tr>"
         try:
-            print >>res, "%d Collectible from %s<br>" % (offs.TotalCollectible, offs.LowestCollectiblePrice.FormattedPrice)
+            print >>res, "<tr><td align=right>%d C</td><td> &gt;= %s</td></tr>" % (offs.TotalCollectible, offs.LowestCollectiblePrice.FormattedPrice)
         except:
-            print >>res, "0 Collectible available</br>"
-        print >>res, "</td>"
+            print >>res, "<tr><td align=right>0 C</td><td></td></tr>"
+        print >>res, "</table></td>"
 
         bycond = dict()
         collectlowprices(bycond, item)
         collectlowprices(bycond, item2)
 
-        print >>res, "<td>"
+        print >>res, "<td><table>"
         for key in bycond.keys():
-            print >>res, "%s: %s" % (key, ' '.join(bycond[key]))
-            print >>res, "<br>"
-        print >>res, "</td>"
+            print >>res, "<tr><td align=right>%s</td><td>%s</td></tr>" % (key, ' '.join(bycond[key]))
+            #print >>res, "<br>"
+        print >>res, "</table></td>"
         
         print >>res, "</tr>"
 
