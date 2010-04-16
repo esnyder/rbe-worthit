@@ -2,6 +2,14 @@ Purpose: Provide a non-technical friendly tool for Rogue Book Exchange
 (www.roguebooks.org) volunteers to easily sort incoming book donations
 and determine which ones are worth listing for sale.
 
-Installation: Place the isbnsearch.py script in your cgi-bin, place an
-amazon.keys file in /etc/apache2/ with your keys.
+Installation: 
+
+* Place the isbnsearch.py script in your cgi-bin (/usr/lib/cgi-bin
+by default for apache2 on ubuntu)
+
+* Place a copy of amazon.keys.template in /etc/apache2/amazon.keys with your keys.
+
+* Create the (empty) shelve file in your cgi-bin directory by running the python
+shell, doing 'import shelve; d = shelve.open('isbnsearch.dat'); d.close()', then
+moving it to /usr/lib/cgi-bin and chown'ing it to the user your web server runs as.
 

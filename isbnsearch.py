@@ -5,8 +5,15 @@ import os, sys, re, lxml, cgi, cgitb, unicodedata, locale, time
 import StringIO
 from ConfigParser import *
 from amazonproduct import *
+from datetime import date
 
 cgitb.enable()
+import shelve
+
+dat = shelve.open("isbnsearch.dat", writeback=True)
+datkey = str(date.fromtimestamp(time.time()).toordinal())
+if not dat.has_key(datkey):
+    dat[datkey] = {'selected': 0, 'unknown': 0, 'rejected': 0}
 
 def dosearch(api, isbn, page):
     node = None
@@ -25,7 +32,7 @@ def safe_note(s):
     return res.replace('\'', "&rsquot;")
 
 # do it this way so we can get two or more pages of offers right off the bat
-def collectlowprices(bycond, item):
+def collectlowprices(bycond, values, item):
     if item is None:
         return
 
@@ -44,6 +51,8 @@ def collectlowprices(bycond, item):
             except: 
                 pass
             bycond[key].append("<span title='Merchant: %0.1f stars on %d ratings ConditionNote: %s'>" % (stars, ratings, condnote) + str(offer.OfferListing.Price.FormattedPrice) + "</span>")
+            if re.match("acceptable", str(offer.OfferAttributes.SubCondition), re.IGNORECASE) is None:
+                values.append(int(offer.OfferListing.Price.Amount))
     except AttributeError, e:
         pass
 
@@ -58,15 +67,38 @@ def firstof(lxmlnode, possibleattributes, default="(none)"):
     return default
 
 
+#
+# rejected, selected or unknown
+#
+def classifyvalues(values):
+    if (values[0] > 300):
+        return "selected"
+    if (len(values) > 5 and values[4] < 300):
+        return "rejected"
+    return "unknown"
+
 def formatitem(item, item2):
     res = StringIO.StringIO()
     try:
         atr = item.ItemAttributes
-
-        print >>res, "<td>"
         author = firstof(atr, ["Author", "Artist", "Creator"])
         pub = firstof(atr, ["Publisher", "Label"])
         sr = firstof(item, ["SalesRank"], 0)
+
+        bycond = dict()
+        values = list()
+        collectlowprices(bycond, values, item)
+        collectlowprices(bycond, values, item2)
+        values.sort()
+        rowclass = classifyvalues(values)
+        if dat[datkey].has_key(rowclass):
+            dat[datkey][rowclass] += 1
+        else:
+            dat[datkey][rowclass] = 1
+
+        print >>res, "<tr class='%s'>" % rowclass
+
+        print >>res, "<td>"
         print >>res, "<b>", cgi.escape(str(atr.Title), True), "</b><br>ASIN: ", item.ASIN, "<br>by", cgi.escape(str(author)), ",", cgi.escape(str(pub))
         print >> res, "</td>"
 
@@ -86,10 +118,6 @@ def formatitem(item, item2):
         except:
             print >>res, "<tr><td align=right>0 C</td><td></td></tr>"
         print >>res, "</table></td>"
-
-        bycond = dict()
-        collectlowprices(bycond, item)
-        collectlowprices(bycond, item2)
 
         print >>res, "<td><table>"
         for key in bycond.keys():
@@ -115,7 +143,7 @@ def process_isbns(isbns):
         node = dosearch(api, isbn, 1)
 
         if node is None:
-            print "<tr><td colspan=3><b>INVALID ISBN: ", isbn, "</b></td></tr>"
+            print "<tr><td colspan=3 bgcolor=yellow><b>INVALID ISBN: ", isbn, "</b></td></tr>"
         else:
             item2 = None
             if node.Items.Item.Offers.TotalOffers > 10:
@@ -134,8 +162,25 @@ def make_apiobj():
     return API(cfg.get("keys", "AMAZON_ACCESS_KEY"), cfg.get("keys", "AMAZON_SECRET_KEY"), "us")
 
 
+def display_searches(shelf, key):
+    print "<h3>ISBN searches: last 7 days</h3>"
+    print "<table border=1>"
+    datkeyordinal = int(key)
+    print "<tr><th>date</th><th>(sell, ?, shelve)</th><th>total # isbn searches</th></tr>"
+    for o in range(datkeyordinal-6, datkeyordinal+1):
+        d = str(date.fromordinal(o))
+        v = shelf.get(str(o), dict())
+        (acc, unkn, rej) = (v.get('selected', 0), v.get('unknown', 0), v.get('rejected', 0))
+        print "<tr><td><b>%s</b>: </td><td>(%d, %d, %d)</td><td><b> %d</b></td></tr>" % (d, acc, unkn, rej, acc+unkn+rej)
+    print "</table>"
+    
 print "Content-Type: text/html\n\n"
-print "<html><head></head>\n<body>"
+print "<html><head>"
+print "<style type='text/css'>"
+print " .rejected { background-color: #FF0000; }"
+print " .selected { background-color: #00FF00; }"
+print "</style>"
+print "</head>\n<body>"
 
 isbnstring = ""
 form = cgi.FieldStorage()
@@ -152,6 +197,11 @@ if form.has_key("isbns"):
     process_isbns(isbns)
 else:
     pass
+
+display_searches(dat, datkey)
+#print "ISBN lookups today: ", dat[datkey], "\n"
+
+dat.close()
 
 print "<h3>Enter ISBNs (or UPC from CD/DVD/etc.) 1 per line</h3>"
 
