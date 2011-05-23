@@ -142,15 +142,19 @@ def process_isbns(isbns):
     for isbn in isbns:
         node = dosearch(api, isbn, 1)
 
-        if node is None:
-            print "<tr><td colspan=3 bgcolor=yellow><b>INVALID ISBN: ", isbn, "</b></td></tr>"
-        else:
-            item2 = None
-            if node.Items.Item.Offers.TotalOffers > 10:
-                node2 = dosearch(api, isbn, 2)
-                if node2 is not None: item2 = node2.Items.Item
-            print formatitem(node.Items.Item, item2)
-
+        try:
+            if node is None:
+                print "<tr><td colspan=3 bgcolor=yellow><b>INVALID ISBN: ", isbn, "</b></td></tr>"
+            else:
+                item2 = None
+                if node.Items.Item.Offers.TotalOffers > 10:
+                    node2 = dosearch(api, isbn, 2)
+                    if node2 is not None: item2 = node2.Items.Item
+                print formatitem(node.Items.Item, item2)
+        except AttributeError, e:
+            print "<tr><td colspan=3 bgcolor=yellow><b>ERROR handling response for ISBN: ", isbn, " search on amazon until Emile fixes script</b></td></tr>"
+        except:
+            print "<tr><td colspan=3 bgcolor=yellow><b>UNKNOWN EXCEPTION PROCESSING ISBN: ", isbn, ", email emile.snyder@gmail.com with the isbn</b></td></tr>"
         sys.stdout.flush()
     print "</table>"
 
