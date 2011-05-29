@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 #
 
-import os, sys, re, lxml, cgi, cgitb, unicodedata, locale, time
+import os, sys, re, lxml, cgi, unicodedata, locale, time
+import cgitb
 import StringIO
 from ConfigParser import *
 from amazonproduct import *
+import urllib2 # for exception handling on timeouts from amazonproduct calls
 from datetime import date
 
 cgitb.enable()
@@ -17,13 +19,7 @@ if not dat.has_key(datkey):
 
 def dosearch(api, isbn, page):
     node = None
-    try:
-        node = api.item_lookup(isbn, IdType="ISBN", SearchIndex="All", MerchantId="All", Condition="All", ResponseGroup="Medium,Offers", OfferPage=page)
-    except InvalidParameterValue, e:
-        if e.args[0] == "ItemId":
-            pass
-        else:
-            raise e
+    node = api.item_lookup(isbn, IdType="ISBN", SearchIndex="All", MerchantId="All", Condition="All", ResponseGroup="Medium,Offers", OfferPage=page)
     return node
 
 def safe_note(s):
@@ -140,21 +136,37 @@ def process_isbns(isbns):
     print "<tr><th>Item Details</th><th>Offer Summary</th><th>20 Lowest Priced Offers</th></tr>"
 
     for isbn in isbns:
-        node = dosearch(api, isbn, 1)
+        try:
+            node = dosearch(api, isbn, 1)
+        except urllib2.URLError, e:
+            print "<tr><td colspan=3 bgcolor=purple><b>TIMEOUT SEARCHING FOR ISBN: ", isbn, "<br>%s</b></td></tr>" % str(e)
+            continue
+        except Exception as e:
+            print "<tr><td colspan=3 bgcolor=purple><b>EXCEPTION HANDLING ISBN: ", isbn, "<br>%s</b></td></tr>" % str(e)
+            continue
+        
+        if node is None:
+            print "<tr><td colspan=3 bgcolor=yellow><b>INVALID ISBN: ", isbn, "</b></td></tr>"
+            continue
 
         try:
-            if node is None:
-                print "<tr><td colspan=3 bgcolor=yellow><b>INVALID ISBN: ", isbn, "</b></td></tr>"
-            else:
-                item2 = None
-                if node.Items.Item.Offers.TotalOffers > 10:
-                    node2 = dosearch(api, isbn, 2)
-                    if node2 is not None: item2 = node2.Items.Item
-                print formatitem(node.Items.Item, item2)
-        except AttributeError, e:
-            print "<tr><td colspan=3 bgcolor=yellow><b>ERROR handling response for ISBN: ", isbn, " search on amazon until Emile fixes script</b></td></tr>"
-        except:
-            print "<tr><td colspan=3 bgcolor=yellow><b>UNKNOWN EXCEPTION PROCESSING ISBN: ", isbn, ", email emile.snyder@gmail.com with the isbn</b></td></tr>"
+            item = None
+            item2 = None
+            # For books with kindle editions, we get one item for the kindle version which *does not* have an Offers attribute
+            # and another (for the one we actually asked for) which does have it.
+            # The kindle ISBN is not the same as the book ISBN, so we can distinguish by that, or by the ItemAttributes.Binding, or .Edition
+            for i in node.Items.Item:
+                if i.__dict__.keys().__contains__("Offers"):
+                    item = i
+                    if item.Offers.TotalOffers > 10:
+                        node2 = dosearch(api, isbn, 2)
+                        if node2 is not None:
+                            for i2 in node2.Items.Item:
+                                if i2.__dict__.keys().__contains__("Offers"):
+                                    item2 = i2
+            print formatitem(item, item2)
+        except Exception as e:
+            print "<tr><td colspan=3 bgcolor=yellow><b>EXCEPTION PROCESSING ISBN: ", isbn, ", email emile.snyder@gmail.com<br>%s</b></td></tr>" % str(e)
         sys.stdout.flush()
     print "</table>"
 
@@ -177,14 +189,6 @@ def display_searches(shelf, key):
         (acc, unkn, rej) = (v.get('selected', 0), v.get('unknown', 0), v.get('rejected', 0))
         print "<tr><td><b>%s</b>: </td><td>(%d, %d, %d)</td><td><b> %d</b></td></tr>" % (d, acc, unkn, rej, acc+unkn+rej)
     print "</table>"
-    
-print "Content-Type: text/html\n\n"
-print "<html><head>"
-print "<style type='text/css'>"
-print " .rejected { background-color: #FF0000; }"
-print " .selected { background-color: #00FF00; }"
-print "</style>"
-print "</head>\n<body>"
 
 isbnstring = ""
 form = cgi.FieldStorage()
@@ -194,24 +198,33 @@ lxml.objectify.enable_recursive_str(True)
 
 locale.setlocale(locale.LC_ALL, 'en_US.utf8')
 
-isbns = list()
-invalidisbns = dict()
-if form.has_key("isbns"):
-    isbns = form["isbns"].value.split()
-    process_isbns(isbns)
-else:
-    pass
+if __name__ != "main":
+    print "Content-Type: text/html\n\n"
+    print "<html><head>"
+    print "<style type='text/css'>"
+    print " .rejected { background-color: #FF0000; }"
+    print " .selected { background-color: #00FF00; }"
+    print "</style>"
+    print "</head>\n<body>"
 
-display_searches(dat, datkey)
-#print "ISBN lookups today: ", dat[datkey], "\n"
+    isbns = list()
+    invalidisbns = dict()
+    if form.has_key("isbns"):
+        isbns = form["isbns"].value.split()
+        process_isbns(isbns)
+    else:
+        pass
 
-dat.close()
+    display_searches(dat, datkey)
+    #print "ISBN lookups today: ", dat[datkey], "\n"
 
-print "<h3>Enter ISBNs (or UPC from CD/DVD/etc.) 1 per line</h3>"
+    dat.close()
 
-print "<form method='GET'>"
-print "<textarea width='80%' name=isbns rows=20></textarea>"
-print "<input type='submit' value='Search'/>"
-print "</form>"
+    print "<h3>Enter ISBNs (or UPC from CD/DVD/etc.) 1 per line</h3>"
 
-print "</body></html>"
+    print "<form method='GET'>"
+    print "<textarea width='80%' name=isbns rows=20></textarea>"
+    print "<input type='submit' value='Search'/>"
+    print "</form>"
+
+    print "</body></html>"
