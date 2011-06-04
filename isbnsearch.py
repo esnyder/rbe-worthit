@@ -19,7 +19,15 @@ if not dat.has_key(datkey):
 
 def dosearch(api, isbn, page):
     node = None
-    node = api.item_lookup(isbn, IdType="ISBN", SearchIndex="All", MerchantId="All", Condition="All", ResponseGroup="Medium,Offers", OfferPage=page)
+    try:
+        idType = "ISBN"
+        if len(isbn) == 12: idType = "UPC"
+        node = api.item_lookup(isbn, IdType=idType, SearchIndex="All", MerchantId="All", Condition="All", ResponseGroup="Medium,Offers", OfferPage=page)
+    except InvalidParameterValue, e:
+        if e.args[0] == "ItemId":
+            pass
+        else:
+            raise e
     return node
 
 def safe_note(s):
