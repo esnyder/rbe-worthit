@@ -4,6 +4,10 @@ and determine which ones are worth listing for sale.
 
 Installation: 
 
+* Get the python amazon product api package, version >= 0.2.5 
+from http://pypi.python.org/pypi/python-amazon-product-api
+and install it.
+
 * Place the isbnsearch.py script in your cgi-bin (/usr/lib/cgi-bin
 by default for apache2 on ubuntu)
 

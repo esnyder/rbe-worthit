@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 
-import os, sys, re, lxml, cgi, unicodedata, locale, time
+import os, sys, re, lxml, cgi, unicodedata, locale, time, traceback
 import cgitb
 import StringIO
 from ConfigParser import *
@@ -23,6 +23,7 @@ def dosearch(api, isbn, page):
         idType = "ISBN"
         if len(isbn) == 12: idType = "UPC"
         node = api.item_lookup(isbn, IdType=idType, SearchIndex="All", MerchantId="All", Condition="All", ResponseGroup="Medium,Offers", OfferPage=page)
+        #open("/tmp/%s-search.xml" % isbn, "w").write(str(node))
     except InvalidParameterValue, e:
         if e.args[0] == "ItemId":
             pass
@@ -42,21 +43,23 @@ def collectlowprices(bycond, values, item):
 
     try:
         for offer in item.Offers.Offer:
-            key = "%s %s" % (offer.OfferAttributes.Condition, offer.OfferAttributes.SubCondition)
-            if not bycond.has_key(key):
-                bycond[key] = list()
-            stars = 0
-            ratings = 0
-            condnote = "(none)"
-            try: 
-                stars = offer.Merchant.AverageFeedbackRating
-                ratings = offer.Merchant.TotalFeedback
-                condnote = safe_note(u'%s' % offer.OfferAttributes.ConditionNote)
-            except: 
-                pass
-            bycond[key].append("<span title='Merchant: %0.1f stars on %d ratings ConditionNote: %s'>" % (stars, ratings, condnote) + str(offer.OfferListing.Price.FormattedPrice) + "</span>")
-            if re.match("acceptable", str(offer.OfferAttributes.SubCondition), re.IGNORECASE) is None:
-                values.append(int(offer.OfferListing.Price.Amount))
+            #key = "%s %s" % (offer.OfferAttributes.Condition, offer.OfferAttributes.SubCondition)
+            key = "%s" % offer.OfferAttributes.Condition
+            #if not bycond.has_key(key):
+            #    bycond[key] = list()
+            #stars = 0
+            #ratings = 0
+            #condnote = "(none)"
+            #try: 
+            #    stars = offer.Merchant.AverageFeedbackRating
+            #    ratings = offer.Merchant.TotalFeedback
+            #    condnote = safe_note(u'%s' % offer.OfferAttributes.ConditionNote)
+            #except: 
+            #    pass
+            #bycond[key].append("<span title='Merchant: %0.1f stars on %d ratings ConditionNote: %s'>" % (stars, ratings, condnote) + str(offer.OfferListing.Price.FormattedPrice) + "</span>")
+            #if re.match("acceptable", str(offer.OfferAttributes.SubCondition), re.IGNORECASE) is None:
+            #    values.append(int(offer.OfferListing.Price.Amount))
+            values.append(int(offer.OfferListing.Price.Amount))
     except AttributeError, e:
         pass
 
@@ -103,7 +106,8 @@ def formatitem(item, item2):
         print >>res, "<tr class='%s'>" % rowclass
 
         print >>res, "<td>"
-        print >>res, "<b>", cgi.escape(str(atr.Title), True), "</b><br>ASIN: ", item.ASIN, "<br>by", cgi.escape(str(author)), ",", cgi.escape(str(pub))
+        #print >>res, "<b>", cgi.escape(str(atr.Title), True), "</b><br>ASIN: ", item.ASIN, "<br>by", cgi.escape(str(author)), ",", cgi.escape(str(pub))
+        print >>res, "<b><a href='%s'>" % item.DetailPageURL, cgi.escape(str(atr.Title), True), "</a></b><br>ASIN: ", item.ASIN, "<br>by", cgi.escape(str(author)), ",", cgi.escape(str(pub))
         print >> res, "</td>"
 
         offs = item.OfferSummary
@@ -135,7 +139,9 @@ def formatitem(item, item2):
         #print >>res, "<tr><td colspan=3>", str(item).replace("\n", "<br>"), "</td></tr>"
     except:
         res.truncate(0)
-        print >>res, "<tr><td colspan=3>Unknown exception: ", str(sys.exc_type), str(sys.exc_value), str(sys.exc_traceback), "</td></tr>"
+        print >>res, "<tr><td colspan=3>Unknown exception: ", 
+        traceback.print_exc(None, res) #str(sys.exc_type), str(sys.exc_value), str(sys.exc_traceback), 
+        print >>res, "</td></tr>"
     return res.getvalue()
 
 
@@ -183,7 +189,7 @@ def process_isbns(isbns):
 def make_apiobj():
     cfg = ConfigParser()
     cfg.read("/etc/apache2/amazon.keys")
-    return API(cfg.get("keys", "AMAZON_ACCESS_KEY"), cfg.get("keys", "AMAZON_SECRET_KEY"), "us")
+    return API(cfg.get("keys", "AMAZON_ACCESS_KEY"), cfg.get("keys", "AMAZON_SECRET_KEY"), "us", cfg.get("keys", "AMAZON_ASSOCIATE_TAG"))
 
 
 def display_searches(shelf, key):
