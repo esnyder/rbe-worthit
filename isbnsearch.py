@@ -84,6 +84,22 @@ def classifyvalues(values):
         return "rejected"
     return "unknown"
 
+def classifyoffersummary(salesrank, offs):
+    lowused = int(offs.LowestUsedPrice.Amount)
+    lownew  = int(offs.LowestNewPrice.Amount)
+    
+    if (lownew < 305):
+        return "rejected"
+    if ((lownew < 1000) and (salesrank > 5000000)):
+        return "rejected"
+    if ((offs.TotalUsed > 50) and (lowused < 2)):
+        return "rejected"
+
+    if ((lowused > 305 and lownew > 305) and (salesrank < 5000000)):
+        return "selected"
+
+    return "unknown"
+
 def formatitem(item, item2):
     res = StringIO.StringIO()
     try:
@@ -97,7 +113,8 @@ def formatitem(item, item2):
         collectlowprices(bycond, values, item)
         collectlowprices(bycond, values, item2)
         values.sort()
-        rowclass = classifyvalues(values)
+        #rowclass = classifyvalues(values)
+        rowclass = classifyoffersummary(sr, item.OfferSummary)
         if dat[datkey].has_key(rowclass):
             dat[datkey][rowclass] += 1
         else:
@@ -107,7 +124,7 @@ def formatitem(item, item2):
 
         print >>res, "<td>"
         #print >>res, "<b>", cgi.escape(str(atr.Title), True), "</b><br>ASIN: ", item.ASIN, "<br>by", cgi.escape(str(author)), ",", cgi.escape(str(pub))
-        print >>res, "<b><a href='%s'>" % item.DetailPageURL, cgi.escape(str(atr.Title), True), "</a></b><br>ASIN: ", item.ASIN, "<br>by", cgi.escape(str(author)), ",", cgi.escape(str(pub))
+        print >>res, "<b><a href='%s' target='_blank'>" % item.DetailPageURL, cgi.escape(atr.Title.text.encode('utf8'), True), "</a></b><br>ASIN: ", item.ASIN, "<br>by", cgi.escape(str(author)), ",", cgi.escape(str(pub))
         print >> res, "</td>"
 
         offs = item.OfferSummary

@@ -16,4 +16,3 @@ by default for apache2 on ubuntu)
 * Create the (empty) shelve file in your cgi-bin directory by running the python
 shell, doing 'import shelve; d = shelve.open('isbnsearch.dat'); d.close()', then
 moving it to /usr/lib/cgi-bin and chown'ing it to the user your web server runs as.
-
