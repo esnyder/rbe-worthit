@@ -36,34 +36,6 @@ def safe_note(s):
     res = cgi.escape(res, True)
     return res.replace('\'', "&rsquot;")
 
-# do it this way so we can get two or more pages of offers right off the bat
-def collectlowprices(bycond, values, item):
-    if item is None:
-        return
-
-    try:
-        for offer in item.Offers.Offer:
-            #key = "%s %s" % (offer.OfferAttributes.Condition, offer.OfferAttributes.SubCondition)
-            key = "%s" % offer.OfferAttributes.Condition
-            #if not bycond.has_key(key):
-            #    bycond[key] = list()
-            #stars = 0
-            #ratings = 0
-            #condnote = "(none)"
-            #try: 
-            #    stars = offer.Merchant.AverageFeedbackRating
-            #    ratings = offer.Merchant.TotalFeedback
-            #    condnote = safe_note(u'%s' % offer.OfferAttributes.ConditionNote)
-            #except: 
-            #    pass
-            #bycond[key].append("<span title='Merchant: %0.1f stars on %d ratings ConditionNote: %s'>" % (stars, ratings, condnote) + str(offer.OfferListing.Price.FormattedPrice) + "</span>")
-            #if re.match("acceptable", str(offer.OfferAttributes.SubCondition), re.IGNORECASE) is None:
-            #    values.append(int(offer.OfferListing.Price.Amount))
-            values.append(int(offer.OfferListing.Price.Amount))
-    except AttributeError, e:
-        pass
-
-
 def firstof(lxmlnode, possibleattributes, default="(none)"):
     for attr in possibleattributes:
         try:
@@ -84,21 +56,57 @@ def classifyvalues(values):
         return "rejected"
     return "unknown"
 
-def classifyoffersummary(salesrank, offs):
-    lowused = int(offs.LowestUsedPrice.Amount)
-    lownew  = int(offs.LowestNewPrice.Amount)
-    
-    if (lownew < 305):
-        return "rejected"
-    if ((lownew < 1000) and (salesrank > 5000000)):
-        return "rejected"
-    if ((offs.TotalUsed > 50) and (lowused < 2)):
-        return "rejected"
+def classifyoffersummaries(salesrank, item):
+    results = {"lowused": None,
+               "lowusedfmt": "--",
+               "lownew":  None,
+               "lownewfmt": "--",
+               "lowcollectible": None,
+               "lowcollectiblefmt": "--",
+               "totalnew": 0,
+               "totalused": 0,
+               "totalcollectible": 0,
+               "class": "unknown"}
 
-    if ((lowused > 305 and lownew > 305) and (salesrank < 5000000)):
-        return "selected"
+    for offs in (item.OfferSummary):
+        results["totalnew"] += offs.TotalNew
+        results["totalused"] += offs.TotalUsed
+        results["totalcollectible"] += offs.TotalCollectible
+        try:
+            lu = int(offs.LowestUsedPrice.Amount)
+            if (results["lowused"] is None or lu < results["lowused"]):
+                results["lowused"] = lu
+                results["lowusedfmt"] = offs.LowestUsedPrice.FormattedPrice
+        except:
+            pass
+        try:
+            ln = int(offs.LowestNewPrice.Amount)
+            if (results["lownew"] is None or ln < results["lownew"]):
+                results["lownew"] = ln
+                results["lownewfmt"] = offs.LowestNewPrice.FormattedPrice
+        except:
+            pass
+        try:
+            lc = int(offs.LowestCollectiblePrice.Amount)
+            if (results["lowcollectible"] is None or lc < results["lowcollectible"]):
+                results["lowcollectible"] = lc
+                results["lowcollectiblefmt"] = offs.LowestCollectiblePrice.FormattedPrice
+        except:
+            pass
 
-    return "unknown"
+    if (results["lownew"] is not None and results["lownew"] < 305):
+        results["class"] = "rejected"
+
+    if ( (results["lownew"] is not None and results["lownew"] < 1000) and ((salesrank is None) or (salesrank > 5000000))):
+        results["class"] =  "rejected"
+
+    if ((results["totalused"] > 50) and results["lowused"] is not None and (results["lowused"] < 2)):
+        results["class"] = "rejected"
+
+    if ((results["lowused"] > 305 and (results["lownew"] is None or results["lownew"] > 305)) and (salesrank is not None) and (salesrank < 5000000)):
+        results["class"] = "selected"
+
+    return results
 
 def formatitem(item, item2):
     res = StringIO.StringIO()
@@ -108,13 +116,19 @@ def formatitem(item, item2):
         pub = firstof(atr, ["Publisher", "Label"])
         sr = firstof(item, ["SalesRank"], 0)
 
+        if author is None or type(author) == type(""):
+            author = "(no author)"
+        else:
+            author = author.text.encode('utf8')
+
+        if pub is None or type(pub) == type(""):
+            pub = "(no publisher)"
+        else:
+            pub = pub.text.encode('utf8')
+
         bycond = dict()
-        values = list()
-        collectlowprices(bycond, values, item)
-        collectlowprices(bycond, values, item2)
-        values.sort()
-        #rowclass = classifyvalues(values)
-        rowclass = classifyoffersummary(sr, item.OfferSummary)
+        offsresult = classifyoffersummaries(sr, item)
+        rowclass = offsresult["class"]
         if dat[datkey].has_key(rowclass):
             dat[datkey][rowclass] += 1
         else:
@@ -124,22 +138,22 @@ def formatitem(item, item2):
 
         print >>res, "<td>"
         #print >>res, "<b>", cgi.escape(str(atr.Title), True), "</b><br>ASIN: ", item.ASIN, "<br>by", cgi.escape(str(author)), ",", cgi.escape(str(pub))
-        print >>res, "<b><a href='%s' target='_blank'>" % item.DetailPageURL, cgi.escape(atr.Title.text.encode('utf8'), True), "</a></b><br>ASIN: ", item.ASIN, "<br>by", cgi.escape(str(author)), ",", cgi.escape(str(pub))
+        print >>res, "<b><a href='%s' target='_blank'>" % item.DetailPageURL, cgi.escape(atr.Title.text.encode('utf8'), True), "</a></b><br>ASIN: ", item.ASIN, "<br>EAN: ", atr.EAN, "<br>ISBN: ", atr.ISBN, "<br>by", cgi.escape(author, True), ",", cgi.escape(pub, True)
         print >> res, "</td>"
 
         offs = item.OfferSummary
         print >>res, "<td><table>"
         print >>res, "<tr><td colspan=2>SalesRank <b>", locale.format("%d", int(sr), True), "</b></td></tr>"
         try:
-            print >>res, "<tr><td align=right>%d N</td><td> &gt;= %s</td></tr>" % (offs.TotalNew, offs.LowestNewPrice.FormattedPrice)
+            print >>res, "<tr><td align=right>%d N</td><td> &gt;= %s</td></tr>" % (offsresult["totalnew"], offsresult["lownewfmt"])
         except:
             print >>res, "<tr><td align=right>0 N</td><td></td></tr>"
         try:
-            print >>res, "<tr><td align=right>%d U</td><td> &gt;= %s</td></tr>" % (offs.TotalUsed, offs.LowestUsedPrice.FormattedPrice)
+            print >>res, "<tr><td align=right>%d U</td><td> &gt;= %s</td></tr>" % (offsresult["totalused"], offsresult["lowusedfmt"])
         except:
             print >>res, "<tr><td align=right>0 U</td><td></td></tr>"
         try:
-            print >>res, "<tr><td align=right>%d C</td><td> &gt;= %s</td></tr>" % (offs.TotalCollectible, offs.LowestCollectiblePrice.FormattedPrice)
+            print >>res, "<tr><td align=right>%d C</td><td> &gt;= %s</td></tr>" % (offsresult["totalcollectible"], offsresult["lowestcollectiblefmt"])
         except:
             print >>res, "<tr><td align=right>0 C</td><td></td></tr>"
         print >>res, "</table></td>"
@@ -189,13 +203,14 @@ def process_isbns(isbns):
             for i in node.Items.Item:
                 if i.__dict__.keys().__contains__("Offers"):
                     item = i
-                    if item.Offers.TotalOffers > 10:
-                        node2 = dosearch(api, isbn, 2)
-                        if node2 is not None:
-                            for i2 in node2.Items.Item:
-                                if i2.__dict__.keys().__contains__("Offers"):
-                                    item2 = i2
-            print formatitem(item, item2)
+                    print formatitem(item, None)
+                    #if item.Offers.TotalOffers > 10:
+                    #    node2 = dosearch(api, isbn, 2)
+                    #    if node2 is not None:
+                    #        for i2 in node2.Items.Item:
+                    #            if i2.__dict__.keys().__contains__("Offers"):
+                    #                item2 = i2
+            #print formatitem(item, item2)
         except Exception as e:
             print "<tr><td colspan=3 bgcolor=yellow><b>EXCEPTION PROCESSING ISBN: ", isbn, ", email emile.snyder@gmail.com<br>%s</b></td></tr>" % str(e)
         sys.stdout.flush()
