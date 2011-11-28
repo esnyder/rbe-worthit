@@ -233,7 +233,7 @@ def display_searches(shelf, key):
         d = str(date.fromordinal(o))
         v = shelf.get(str(o), dict())
         (acc, unkn, rej) = (v.get('selected', 0), v.get('unknown', 0), v.get('rejected', 0))
-        print "<tr><td><b>%s</b>: </td><td>(%d, %d, %d)</td><td><b> %d</b></td></tr>" % (d, acc, unkn, rej, acc+unkn+rej)
+        print "<tr><td><b>%s</b>: </td><td>(<span class='selected'>%d</span>, %d, <span class='rejected'>%d</span>)</td><td><b> %d</b></td></tr>" % (d, acc, unkn, rej, acc+unkn+rej)
     print "</table>"
 
 isbnstring = ""
