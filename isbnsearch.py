@@ -100,7 +100,7 @@ def classifyoffersummaries(salesrank, item):
     if ( (results["lownew"] is not None and results["lownew"] < 1000) and ((salesrank is None) or (salesrank > 5000000))):
         results["class"] =  "rejected"
 
-    if ((results["totalused"] > 50) and results["lowused"] is not None and (results["lowused"] < 2)):
+    if ((results["totalused"] > 30) and results["lowused"] is not None and (results["lowused"] < 2)):
         results["class"] = "rejected"
 
     if ((results["lowused"] > 305 and (results["lownew"] is None or results["lownew"] > 305)) and (salesrank is not None) and (salesrank < 5000000)):
