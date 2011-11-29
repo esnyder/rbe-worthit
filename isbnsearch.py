@@ -138,7 +138,7 @@ def formatitem(item, item2):
 
         print >>res, "<td>"
         #print >>res, "<b>", cgi.escape(str(atr.Title), True), "</b><br>ASIN: ", item.ASIN, "<br>by", cgi.escape(str(author)), ",", cgi.escape(str(pub))
-        print >>res, "<b><a href='%s' target='_blank'>" % item.DetailPageURL, cgi.escape(atr.Title.text.encode('utf8'), True), "</a></b><br>ASIN: ", item.ASIN, "<br>EAN: ", atr.EAN, "<br>ISBN: ", atr.ISBN, "<br>by", cgi.escape(author, True), ",", cgi.escape(pub, True)
+        print >>res, "<b><a href='%s' target='_blank'>" % item.DetailPageURL, cgi.escape(atr.Title.text.encode('utf8'), True), "</a></b><br>ASIN: ", item.ASIN, "<br>EAN: ", firstof(atr, "EAN"), "<br>ISBN: ", firstof(atr, "ISBN"), "<br>by", cgi.escape(author, True), ",", cgi.escape(pub, True)
         print >> res, "</td>"
 
         offs = item.OfferSummary
