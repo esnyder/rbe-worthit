@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 #
-
+# Algorithm:
+#
+#  * For any item with an ISBN, we want to say:
+#    - if the sales rank is 
+#
 import os, sys, re, lxml, cgi, unicodedata, locale, time, traceback
 import cgitb
 import StringIO
@@ -16,6 +20,11 @@ dat = shelve.open("isbnsearch.dat", writeback=True)
 datkey = str(date.fromtimestamp(time.time()).toordinal())
 if not dat.has_key(datkey):
     dat[datkey] = {'selected': 0, 'unknown': 0, 'rejected': 0}
+
+lowcutoffprice = 500.0 # in pennies US$
+highcutoffprice = 1000.0 # in pennies US$
+cutoffprice_epsilon = 5.0
+salesrankcutoff = 5000000
 
 def dosearch(api, isbn, page):
     node = None
@@ -50,9 +59,9 @@ def firstof(lxmlnode, possibleattributes, default="(none)"):
 # rejected, selected or unknown
 #
 def classifyvalues(values):
-    if (values[0] > 300):
+    if (values[0] > usedcutoffprice):
         return "selected"
-    if (len(values) > 5 and values[4] < 300):
+    if (len(values) > 5 and values[4] < usedcutoffprice):
         return "rejected"
     return "unknown"
 
@@ -66,7 +75,8 @@ def classifyoffersummaries(salesrank, item):
                "totalnew": 0,
                "totalused": 0,
                "totalcollectible": 0,
-               "class": "unknown"}
+               "class": "unknown",
+               "msg": ""}
 
     for offs in (item.OfferSummary):
         results["totalnew"] += offs.TotalNew
@@ -94,17 +104,25 @@ def classifyoffersummaries(salesrank, item):
         except:
             pass
 
-    if (results["lownew"] is not None and results["lownew"] < 305):
+    # if we have new items offered for less than 'lowcutoffprice' then we don't want to list
+    if (results["lownew"] is not None and results["lownew"] < (lowcutoffprice+cutoffprice_epsilon)):
         results["class"] = "rejected"
+        results["msg"] = "rejected because there are new copies for sale at less than $%.2f" % ((lowcutoffprice+cutoffprice_epsilon)/100.0)
 
-    if ( (results["lownew"] is not None and results["lownew"] < 1000) and ((salesrank is None) or (salesrank > 5000000))):
+    # if we have very poor selling items offered for less than 'highcutoffprice' then we don't want to list
+    if ( (results["lownew"] is not None and results["lownew"] < highcutoffprice) and ((salesrank is None) or (salesrank > salesrankcutoff))):
         results["class"] =  "rejected"
+        results["msg"] = "rejected because salesrank is poor and there are new copies for sale at less than $%.2f" % ((highcutoffprice)/100.0)
 
+    # if we have more than 30 items used, and lowprice is a penny, don't list
     if ((results["totalused"] > 30) and results["lowused"] is not None and (results["lowused"] < 2)):
         results["class"] = "rejected"
+        results["msg"] = "rejected because there are more than 30 used copies available and the lowprice is a penny"
 
-    if ((results["lowused"] > 305 and (results["lownew"] is None or results["lownew"] > 305)) and (salesrank is not None) and (salesrank < 5000000)):
+    # if there are no items listed below 'lowcutoffprice' and the salesrank exists and is < 'salesrankcutoff', then DO list
+    if ((results["lowused"] > (lowcutoffprice+cutoffprice_epsilon) and (results["lownew"] is None or results["lownew"] > (lowcutoffprice+cutoffprice_epsilon))) and (salesrank is not None) and (salesrank < salesrankcutoff)):
         results["class"] = "selected"
+        results["msg"] = "ACCEPTED because low price is > $%.2f and sales rank is < %d" % (((lowcutoffprice+cutoffprice_epsilon)/100.0), salesrankcutoff)
 
     return results
 
@@ -134,7 +152,7 @@ def formatitem(item, item2):
         else:
             dat[datkey][rowclass] = 1
 
-        print >>res, "<tr class='%s'>" % rowclass
+        print >>res, "<tr class='%s' title='%s'>" % (rowclass, offsresult["msg"])
 
         print >>res, "<td>"
         #print >>res, "<b>", cgi.escape(str(atr.Title), True), "</b><br>ASIN: ", item.ASIN, "<br>by", cgi.escape(str(author)), ",", cgi.escape(str(pub))
@@ -267,6 +285,11 @@ if __name__ != "main":
     dat.close()
 
     print "<h3>Enter ISBNs (or UPC from CD/DVD/etc.) 1 per line</h3>"
+    #print "Listing calculations using:<br>"
+    #print "low price cutoff:   $%.2f<br>" % (lowcutoffprice / 100.0)
+    #print "high price cutoff:  $%.2f<br>" % (highcutoffprice / 100.0)
+    #print "salesrank cutoff:   %d<br>" % salesrankcutoff
+    #print "<br>"
 
     print "<form method='GET'>"
     print "<textarea width='80%' name=isbns rows=20></textarea>"
