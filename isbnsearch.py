@@ -22,9 +22,9 @@ if not dat.has_key(datkey):
     dat[datkey] = {'selected': 0, 'unknown': 0, 'rejected': 0}
 
 lowcutoffprice = 500.0 # in pennies US$
-highcutoffprice = 1000.0 # in pennies US$
+highcutoffprice = 1500.0 # in pennies US$
 cutoffprice_epsilon = 5.0
-salesrankcutoff = 5000000
+salesrankcutoff = 10000000
 
 def dosearch(api, isbn, page):
     node = None
@@ -114,18 +114,31 @@ def classifyoffersummaries(salesrank, item):
         results["class"] =  "rejected"
         results["msg"] = "rejected because salesrank is poor and there are new copies for sale at less than $%.2f" % ((highcutoffprice)/100.0)
 
-    # if we have more than 30 items used, and lowprice is a penny, don't list
-    if ((results["totalused"] > 30) and results["lowused"] is not None and (results["lowused"] < 2)):
+    # if we have more than 20 items used, and lowprice is < a dollar, don't list
+    if ((results["totalused"] > 20) and results["lowused"] is not None and (results["lowused"] < 100)):
         results["class"] = "rejected"
-        results["msg"] = "rejected because there are more than 30 used copies available and the lowprice is a penny"
+        results["msg"] = "rejected because there are more than 20 used copies available and the lowprice is < $1.00"
 
     # if there are no items listed below 'lowcutoffprice' and the salesrank exists and is < 'salesrankcutoff', then DO list
     if ((results["lowused"] > (lowcutoffprice+cutoffprice_epsilon) and (results["lownew"] is None or results["lownew"] > (lowcutoffprice+cutoffprice_epsilon))) and (salesrank is not None) and (salesrank < salesrankcutoff)):
         results["class"] = "selected"
         results["msg"] = "ACCEPTED because low price is > $%.2f and sales rank is < %d" % (((lowcutoffprice+cutoffprice_epsilon)/100.0), salesrankcutoff)
 
+    ### NEW TODAY ###
+    # if there are no items listed below 'highcutoffprice' and the salesrank exists and is > 'salesrankcutoff', then DO list
+    if ((results["lowused"] > (highcutoffprice+cutoffprice_epsilon) and (results["lownew"] is None or results["lownew"] > (highcutoffprice+cutoffprice_epsilon))) and (salesrank is not None) and (salesrank > salesrankcutoff)):
+        results["class"] = "selected"
+        results["msg"] = "ACCEPTED because low price is > $%.2f and sales rank is > %d" % (((highcutoffprice+cutoffprice_epsilon)/100.0), salesrankcutoff)
+
+    ### NEW TODAY ###
+    # if there is NO sales rank and the prices is > $25, list
+    if (salesrank is None) and ((results["lowused"] > 2500+cutoffprice_epsilon) and (results["lownew"] is None or results["lownew"] > 2500+cutoffprice_epsilon)):
+        results["class"] = "selected"
+        results["msg"] = "ACCEPTED because low price is > $%.2f and there is no sales rank" % 25.00
+
     return results
 
+    
 def formatitem(item, item2):
     res = StringIO.StringIO()
     try:
