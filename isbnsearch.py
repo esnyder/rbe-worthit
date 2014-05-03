@@ -65,7 +65,8 @@ def classifyvalues(values):
         return "rejected"
     return "unknown"
 
-def classifyoffersummaries(salesrank, item):
+def classifyoffersummaries(item):
+    salesrank = firstof(item, ["SalesRank"], 0)
     results = {"lowused": None,
                "lowusedfmt": "--",
                "lownew":  None,
@@ -139,7 +140,7 @@ def classifyoffersummaries(salesrank, item):
     return results
 
     
-def formatitem(item, item2):
+def formatitem(item, offsresult):
     res = StringIO.StringIO()
     try:
         atr = item.ItemAttributes
@@ -158,7 +159,6 @@ def formatitem(item, item2):
             pub = pub.text.encode('utf8')
 
         bycond = dict()
-        offsresult = classifyoffersummaries(sr, item)
         rowclass = offsresult["class"]
         if dat[datkey].has_key(rowclass):
             dat[datkey][rowclass] += 1
@@ -227,26 +227,42 @@ def process_isbns(isbns):
 
         try:
             item = None
-            item2 = None
             # For books with kindle editions, we get one item for the kindle version which *does not* have an Offers attribute
             # and another (for the one we actually asked for) which does have it.
             # The kindle ISBN is not the same as the book ISBN, so we can distinguish by that, or by the ItemAttributes.Binding, or .Edition
+            itemsandoffers = []
             for i in node.Items.Item:
                 if i.__dict__.keys().__contains__("Offers"):
                     item = i
-                    print formatitem(item, None)
-                    #if item.Offers.TotalOffers > 10:
-                    #    node2 = dosearch(api, isbn, 2)
-                    #    if node2 is not None:
-                    #        for i2 in node2.Items.Item:
-                    #            if i2.__dict__.keys().__contains__("Offers"):
-                    #                item2 = i2
-            #print formatitem(item, item2)
+                    offers = classifyoffersummaries(item)
+                    itemsandoffers.append((item, offers))
+
+            # FIXME: ok, in the case where we have multiple itemsandoffers,
+            # should create a formatted listing using different code, better
+            # explain what's going on.
+            (item, offers) = realitemandoffers(itemsandoffers)
+            if (item is not None):
+                print formatitem(item, offers)
+            elif (allselected(itemsandoffers)):
+                print formatitem(itemsandoffers[0][0], itemsandoffers[0][1])
+            else:
+                print "<tr><td colspan=3 bgcolor=red><b>%d ASIN LISTINGS FOR ISBN: " % len(itemsandoffers), isbn, "</b>, not all accept</td></tr>"
+
         except Exception as e:
             print "<tr><td colspan=3 bgcolor=yellow><b>EXCEPTION PROCESSING ISBN: ", isbn, ", email emile.snyder@gmail.com<br>%s</b></td></tr>" % str(e)
         sys.stdout.flush()
     print "</table>"
 
+def realitemandoffers(itemsandoffers):
+    for (item, offers) in itemsandoffers:
+        if item.ASIN[0] != 'B':
+            return (item, offers)
+    return (None, None)
+
+def allselected(itemsandoffers):
+    for (item, offers) in itemsandoffers:
+        if offers['class'] == 'rejected': return False
+    return True
 
 # api = API(os.getenv("AMAZON_ACCESS_KEY"), os.getenv("AMAZON_SECRET_KEY"), "us")
 def make_apiobj():
