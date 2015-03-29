@@ -268,6 +268,8 @@ def allselected(itemsandoffers):
 def make_apiobj():
     cfg = ConfigParser()
     cfg.read("/etc/apache2/amazon.keys")
+    if not cfg.has_option("keys", "AMAZON_ACCESS_KEY"):
+        cfg.read("./amazon.keys")
     return API(cfg.get("keys", "AMAZON_ACCESS_KEY"), cfg.get("keys", "AMAZON_SECRET_KEY"), "us", cfg.get("keys", "AMAZON_ASSOCIATE_TAG"))
 
 
